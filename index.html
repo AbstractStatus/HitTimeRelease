@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HitTime Release</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #0f1115;
+    color: #e6e6e6;
+    min-height: 100vh;
+    padding: 40px 16px;
+  }
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  header h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    letter-spacing: 1px;
+  }
+  header p {
+    margin: 0;
+    color: #9aa0a6;
+    font-size: 14px;
+  }
+  .category {
+    background: #1a1d24;
+    border: 1px solid #2a2f3a;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .category.manual { border-left: 4px solid #f5a623; }
+  .category.release { border-left: 4px solid #4a9eff; }
+  .category h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge {
+    font-size: 12px;
+    font-weight: normal;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #2a2f3a;
+    color: #cfd3da;
+  }
+  .category.manual .badge { background: rgba(245, 166, 35, 0.15); color: #f5a623; }
+  .category.release .badge { background: rgba(74, 158, 255, 0.15); color: #4a9eff; }
+  .desc {
+    margin: 0 0 18px;
+    color: #b0b6bf;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  ul.files {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  ul.files li {
+    margin-bottom: 10px;
+  }
+  ul.files li:last-child {
+    margin-bottom: 0;
+  }
+  .file-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #22262f;
+    border: 1px solid #2e343f;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+  .file-link:hover {
+    background: #2a2f3a;
+    border-color: #4a9eff;
+    transform: translateY(-1px);
+  }
+  .file-name {
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 14px;
+    word-break: break-all;
+  }
+  .file-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #8a919c;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .size { white-space: nowrap; }
+  .download-btn {
+    font-size: 13px;
+    color: #4a9eff;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .status {
+    text-align: center;
+    color: #9aa0a6;
+    padding: 40px 0;
+    font-size: 14px;
+  }
+  .error { color: #ff6b6b; }
+  .empty { color: #6b7280; }
+  footer {
+    text-align: center;
+    color: #5c6370;
+    font-size: 12px;
+    margin-top: 32px;
+  }
+  footer a { color: #4a9eff; text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>HitTime 发布页</h1>
+      <p>点击下方文件即可下载 APK</p>
+    </header>
+
+    <section class="category manual">
+      <h2>Manual 版本 <span class="badge">manual_*</span></h2>
+      <p class="desc">纯人工的最后一个稳定版本，后续不再维护（尽管有重大已知问题）</p>
+      <ul class="files" id="manual-list">
+        <li class="status">加载中…</li>
+      </ul>
+    </section>
+
+    <section class="category release">
+      <h2>Release 版本 <span class="badge">release_*</span></h2>
+      <p class="desc">纯AI介入，持续维护，但是不确定性会很多</p>
+      <ul class="files" id="release-list">
+        <li class="status">加载中…</li>
+      </ul>
+    </section>
+
+    <footer>
+      文件列表通过 GitHub API 动态获取 · <a href="https://github.com/AbstractStatus/HitTimeRelease" target="_blank" rel="noopener">GitHub 仓库</a>
+    </footer>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // 从当前页面 URL 推断 GitHub owner/repo，便于迁移到其他仓库
+  function detectRepo() {
+    var host = window.location.hostname;
+    var path = window.location.pathname;
+    var owner = null;
+    var repo = null;
+
+    var m = host.match(/^([^.]+)\.github\.io$/i);
+    if (m) {
+      owner = m[1];
+      // 项目页: https://owner.github.io/repo/  -> 首段路径即 repo
+      var seg = path.split("/").filter(Boolean)[0];
+      repo = seg || (owner + ".github.io");
+    }
+
+    // 兜底：已知仓库信息
+    if (!owner) owner = "AbstractStatus";
+    if (!repo) repo = "HitTimeRelease";
+
+    return { owner: owner, repo: repo };
+  }
+
+  function formatSize(bytes) {
+    if (bytes == null || isNaN(bytes)) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function renderList(container, files) {
+    if (!files.length) {
+      container.innerHTML = '<li class="status empty">暂无文件</li>';
+      return;
+    }
+    container.innerHTML = files
+      .map(function (f) {
+        return (
+          '<li>' +
+            '<a class="file-link" href="' + encodeURIComponent(f.name) + '" download="' + f.name + '">' +
+              '<span class="file-name">' + escapeHtml(f.name) + '</span>' +
+              '<span class="file-meta">' +
+                (f.size != null ? '<span class="size">' + formatSize(f.size) + '</span>' : '') +
+                '<span class="download-btn">下载 ↓</span>' +
+              '</span>' +
+            '</a>' +
+          '</li>'
+        );
+      })
+      .join("");
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function showError(container, msg) {
+    container.innerHTML = '<li class="status error">' + escapeHtml(msg) + '</li>';
+  }
+
+  var repoInfo = detectRepo();
+  var apiUrl =
+    "https://api.github.com/repos/" +
+    repoInfo.owner +
+    "/" +
+    repoInfo.repo +
+    "/contents/";
+
+  var manualContainer = document.getElementById("manual-list");
+  var releaseContainer = document.getElementById("release-list");
+
+  fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error("GitHub API 请求失败 (" + res.status + ")");
+      }
+      return res.json();
+    })
+    .then(function (data) {
+      var items = Array.isArray(data) ? data : [];
+      var apks = items.filter(function (f) {
+        return f.type === "file" && /\.apk$/i.test(f.name);
+      });
+
+      var manual = apks
+        .filter(function (f) { return /^manual_/i.test(f.name); })
+        .sort(function (a, b) { return a.name.localeCompare(b.name); });
+
+      var release = apks
+        .filter(function (f) { return /^release_/i.test(f.name); })
+        .sort(function (a, b) { return b.name.localeCompare(a.name); }); // 新版本在前
+
+      renderList(manualContainer, manual);
+      renderList(releaseContainer, release);
+    })
+    .catch(function (err) {
+      var msg = "加载文件列表失败：" + err.message + "（可能触发 GitHub API 限流，请稍后重试）";
+      showError(manualContainer, msg);
+      showError(releaseContainer, msg);
+    });
+})();
+</script>
+</body>
+</html>
