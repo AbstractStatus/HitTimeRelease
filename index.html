@@ -117,7 +117,7 @@
   .status {
     text-align: center;
     color: #9aa0a6;
-    padding: 40px 0;
+    padding: 12px 0;
     font-size: 14px;
   }
   .error { color: #ff6b6b; }
@@ -155,7 +155,7 @@
     </section>
 
     <footer>
-      文件列表通过 GitHub API 动态获取 · <a href="https://github.com/AbstractStatus/HitTimeRelease" target="_blank" rel="noopener">GitHub 仓库</a>
+      文件清单由 files.json 生成 · <a href="https://github.com/AbstractStatus/HitTimeRelease" target="_blank" rel="noopener">GitHub 仓库</a>
     </footer>
   </div>
 
@@ -163,26 +163,13 @@
 (function () {
   "use strict";
 
-  // 从当前页面 URL 推断 GitHub owner/repo，便于迁移到其他仓库
-  function detectRepo() {
-    var host = window.location.hostname;
-    var path = window.location.pathname;
-    var owner = null;
-    var repo = null;
+  var manualContainer = document.getElementById("manual-list");
+  var releaseContainer = document.getElementById("release-list");
 
-    var m = host.match(/^([^.]+)\.github\.io$/i);
-    if (m) {
-      owner = m[1];
-      // 项目页: https://owner.github.io/repo/  -> 首段路径即 repo
-      var seg = path.split("/").filter(Boolean)[0];
-      repo = seg || (owner + ".github.io");
-    }
-
-    // 兜底：已知仓库信息
-    if (!owner) owner = "AbstractStatus";
-    if (!repo) repo = "HitTimeRelease";
-
-    return { owner: owner, repo: repo };
+  function escapeHtml(s) {
+    var div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
   }
 
   function formatSize(bytes) {
@@ -192,9 +179,9 @@
     return (bytes / (1024 * 1024)).toFixed(2) + " MB";
   }
 
-  function renderList(container, files) {
+  function renderList(container, files, emptyText) {
     if (!files.length) {
-      container.innerHTML = '<li class="status empty">暂无文件</li>';
+      container.innerHTML = '<li class="status empty">' + emptyText + "</li>";
       return;
     }
     container.innerHTML = files
@@ -214,53 +201,23 @@
       .join("");
   }
 
-  function escapeHtml(s) {
-    var div = document.createElement("div");
-    div.textContent = s;
-    return div.innerHTML;
-  }
-
   function showError(container, msg) {
     container.innerHTML = '<li class="status error">' + escapeHtml(msg) + '</li>';
   }
 
-  var repoInfo = detectRepo();
-  var apiUrl =
-    "https://api.github.com/repos/" +
-    repoInfo.owner +
-    "/" +
-    repoInfo.repo +
-    "/contents/";
-
-  var manualContainer = document.getElementById("manual-list");
-  var releaseContainer = document.getElementById("release-list");
-
-  fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } })
+  // 读取同目录下由 gen_index.py 生成的 files.json（同源，无外部 API）
+  fetch("files.json", { cache: "no-cache" })
     .then(function (res) {
-      if (!res.ok) {
-        throw new Error("GitHub API 请求失败 (" + res.status + ")");
-      }
+      if (!res.ok) throw new Error("files.json 请求失败 (" + res.status + ")");
       return res.json();
     })
     .then(function (data) {
-      var items = Array.isArray(data) ? data : [];
-      var apks = items.filter(function (f) {
-        return f.type === "file" && /\.apk$/i.test(f.name);
-      });
-
-      var manual = apks
-        .filter(function (f) { return /^manual_/i.test(f.name); })
-        .sort(function (a, b) { return a.name.localeCompare(b.name); });
-
-      var release = apks
-        .filter(function (f) { return /^release_/i.test(f.name); })
-        .sort(function (a, b) { return b.name.localeCompare(a.name); }); // 新版本在前
-
-      renderList(manualContainer, manual);
-      renderList(releaseContainer, release);
+      renderList(manualContainer, data.manual || [], "暂无文件");
+      renderList(releaseContainer, data.release || [], "暂无文件");
     })
     .catch(function (err) {
-      var msg = "加载文件列表失败：" + err.message + "（可能触发 GitHub API 限流，请稍后重试）";
+      var msg = "加载文件清单失败：" + err.message +
+        "。请先运行 python gen_index.py 生成 files.json";
       showError(manualContainer, msg);
       showError(releaseContainer, msg);
     });

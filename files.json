@@ -1,0 +1,30 @@
+{
+  "manual": [
+    {
+      "name": "manual_last.apk",
+      "size": 29038960
+    }
+  ],
+  "release": [
+    {
+      "name": "release_2026091804.apk",
+      "size": 29061655
+    },
+    {
+      "name": "release_2026091803.apk",
+      "size": 29076413
+    },
+    {
+      "name": "release_2026091802.apk",
+      "size": 29044482
+    },
+    {
+      "name": "release_2026091801.apk",
+      "size": 29044482
+    },
+    {
+      "name": "release_2026091701.apk",
+      "size": 29045073
+    }
+  ]
+}
